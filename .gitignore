@@ -1,0 +1,24 @@
+node_modules
+.env
+!.env-example
+coverage
+coverage.json
+typechain
+typechain-types
+
+**/src/types
+**/artifacts
+**/build
+**/cache
+**/coverage
+**/.coverage_artifacts
+**/.coverage_cache
+**/.coverage_contracts
+**/dist
+
+#Hardhat files
+cache
+artifacts
+
+coverage.json
+
