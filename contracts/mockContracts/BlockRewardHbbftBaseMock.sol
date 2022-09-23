@@ -10,7 +10,7 @@ contract BlockRewardHbbftBaseMock is BlockRewardHbbftBase {
 
     // ============================================== Modifiers =======================================================
 
-    modifier onlySystem() {
+    modifier onlySystem() override virtual {
         require(msg.sender == _getSystemAddress());
         _;
     }

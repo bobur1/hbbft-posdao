@@ -82,7 +82,7 @@ contract Registry is Owned, IMetadataRegistry, IOwnerRegistry, IReverseRegistry 
         _;
     }
 
-    constructor(address _certifierContract, address _owner) public {
+    constructor(address _certifierContract, address _owner) {
         require(_certifierContract != address(0));
         bytes32 serviceTransactionChecker = keccak256("service_transaction_checker");
         address entryOwner = msg.sender;
@@ -237,7 +237,10 @@ contract Registry is Owned, IMetadataRegistry, IOwnerRegistry, IReverseRegistry 
         returns (bool)
     {
         emit Drained(address(this).balance);
-        msg.sender.transfer(address(this).balance);
+
+        (bool success, ) = msg.sender.call{value :address(this).balance}("");
+        require(success, "Transfer failed.");
+
         return true;
     }
 

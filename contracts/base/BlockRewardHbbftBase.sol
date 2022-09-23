@@ -6,6 +6,7 @@ import "../interfaces/IRandomHbbft.sol";
 import "../interfaces/IStakingHbbft.sol";
 import "../interfaces/IValidatorSetHbbft.sol";
 import "../upgradeability/UpgradeableOwned.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 
 contract Sacrifice {
@@ -16,7 +17,7 @@ contract Sacrifice {
 
 
 /// @dev Generates and distributes rewards according to the logic and formulas described in the POSDAO white paper.
-contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft {
+contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft, Initializable {
     // =============================================== Storage ========================================================
 
     // WARNING: since this contract is upgradeable, do not remove
@@ -89,21 +90,15 @@ contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft {
 
     // ============================================== Modifiers =======================================================
 
-    /// @dev Ensures the `initialize` function was called before.
-    modifier onlyInitialized {
-        require(isInitialized());
-        _;
-    }
-
     /// @dev Ensures the caller is the SYSTEM_ADDRESS. See https://wiki.parity.io/Block-Reward-Contract.html
-    modifier onlySystem {
+    modifier onlySystem virtual {
         require(msg.sender == 0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE);
         _;
     }
 
     /// @dev Ensures the caller is the StakingHbbft contract address.
     modifier onlyStakingContract() {
-        require(msg.sender == address(validatorSetContract.stakingContract()));
+        require(msg.sender == validatorSetContract.getStakingContract());
         _;
     }
 
@@ -123,17 +118,16 @@ contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft {
     /// @dev Initializes the contract at network startup.
     /// Can only be called by the constructor of the `InitializerHbbft` contract or owner.
     /// @param _validatorSet The address of the `ValidatorSetHbbft` contract.
-    function initialize(address _validatorSet) external {
+    function initialize(address _validatorSet) external initializer {
         require(msg.sender == _admin() || tx.origin ==  _admin() || address(0) ==  _admin() || block.number == 0,
             "Initialization only on genesis block or by admin");
-        require(!isInitialized(), "initialization can only be done once");
         require(_validatorSet != address(0), "ValidatorSet must not be 0");
         validatorSetContract = IValidatorSetHbbft(_validatorSet);
         validatorMinRewardPercent[0] = VALIDATOR_MIN_REWARD_PERCENT;
 
         deltaPotPayoutFraction = 6000;
         reinsertPotPayoutFraction = 6000;
-        governancePotAddress = 0xDA0da0da0Da0Da0Da0DA00DA0da0da0DA0DA0dA0;
+        governancePotAddress = payable(0xDA0da0da0Da0Da0Da0DA00DA0da0da0DA0DA0dA0);
         governancePotShareNominator = 1;
         governancePotShareDenominator = 10;
     }
@@ -197,13 +191,13 @@ contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft {
     onlySystem
     returns(uint256 rewardsNative)
     {
-        IStakingHbbft stakingContract = IStakingHbbft(validatorSetContract.stakingContract());
+        IStakingHbbft stakingContract = IStakingHbbft(validatorSetContract.getStakingContract());
         // If this is the last block of the epoch i.e. master key has been generated.
 
         if (_isEpochEndBlock) {
 
             
-            uint256 stakingEpoch = stakingContract.stakingEpoch();
+            uint256 stakingEpoch = stakingContract.getStakingEpoch();
 
             uint256 nativeTotalRewardAmount;
             // Distribute rewards among validator pools
@@ -290,14 +284,6 @@ contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft {
         return _epochsPoolGotRewardFor[_miningAddress];
     }
 
-    /// @dev Returns a boolean flag indicating if the `initialize` function has been called.
-    function isInitialized()
-    public
-    view
-    returns(bool) {
-        return validatorSetContract != IValidatorSetHbbft(0);
-    }
-
     /// @dev Returns an array of epoch numbers for which the specified staker
     /// can claim a reward from the specified pool by the `StakingHbbft.claimReward` function.
     /// @param _poolStakingAddress The pool staking address.
@@ -310,17 +296,17 @@ contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft {
     view
     returns(uint256[] memory epochsToClaimFrom) {
         address miningAddress = validatorSetContract.miningByStakingAddress(_poolStakingAddress);
-        IStakingHbbft stakingContract = IStakingHbbft(validatorSetContract.stakingContract());
+        IStakingHbbft stakingContract = IStakingHbbft(validatorSetContract.getStakingContract());
         bool isDelegator = _poolStakingAddress != _staker;
         uint256 firstEpoch;
         uint256 lastEpoch;
 
         if (isDelegator) {
-            firstEpoch = stakingContract.stakeFirstEpoch(_poolStakingAddress, _staker);
+            firstEpoch = stakingContract.getStakeFirstEpoch(_poolStakingAddress, _staker);
             if (firstEpoch == 0) {
                 return (new uint256[](0));
             }
-            lastEpoch = stakingContract.stakeLastEpoch(_poolStakingAddress, _staker);
+            lastEpoch = stakingContract.getStakeLastEpoch(_poolStakingAddress, _staker);
         }
 
         uint256[] storage epochs = _epochsPoolGotRewardFor[miningAddress];
@@ -344,7 +330,7 @@ contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft {
                     break;
                 }
             }
-            if (!stakingContract.rewardWasTaken(_poolStakingAddress, _staker, epoch)) {
+            if (!stakingContract.getRewardWasTaken(_poolStakingAddress, _staker, epoch)) {
                 tmp[tmpLength++] = epoch;
             }
         }
@@ -365,8 +351,8 @@ contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft {
     public
     view
     returns(uint256) {
-        IStakingHbbft stakingContract = IStakingHbbft(validatorSetContract.stakingContract());
-        uint256 stakingEpoch = stakingContract.stakingEpoch();
+        IStakingHbbft stakingContract = IStakingHbbft(validatorSetContract.getStakingContract());
+        uint256 stakingEpoch = stakingContract.getStakingEpoch();
 
         if (stakingEpoch == 0) {
             // No one gets a reward for the initial staking epoch, so we return zero.
@@ -390,8 +376,8 @@ contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft {
         // we return the potentially possible reward coefficient
         return validatorShare(
             stakingEpoch,
-            stakingContract.stakeAmount(_stakingAddress, _stakingAddress),
-            stakingContract.stakeAmountTotal(_stakingAddress),
+            stakingContract.getStakeAmount(_stakingAddress, _stakingAddress),
+            stakingContract.getStakeAmountTotal(_stakingAddress),
             REWARD_PERCENT_MULTIPLIER
         );
     }
@@ -559,13 +545,13 @@ contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft {
             return;
         }
         address stakingAddress = validatorSetContract.stakingByMiningAddress(_miningAddress);
-        uint256 totalAmount = _stakingContract.stakeAmountTotal(stakingAddress);
+        uint256 totalAmount = _stakingContract.getStakeAmountTotal(stakingAddress);
         if (totalAmount == 0) {
             return;
         }
         snapshotPoolTotalStakeAmount[_stakingEpoch][_miningAddress] = totalAmount;
         snapshotPoolValidatorStakeAmount[_stakingEpoch][_miningAddress] =
-            _stakingContract.stakeAmount(stakingAddress, stakingAddress);
+            _stakingContract.getStakeAmount(stakingAddress, stakingAddress);
     }
 
     /// @dev Called by the `transferReward` of a child contract to transfer native coins
@@ -578,7 +564,7 @@ contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft {
             // We use the `Sacrifice` trick to be sure the coins can be 100% sent to the receiver.
             // Otherwise, if the receiver is a contract which has a revert in its fallback function,
             // the sending will fail.
-            (new Sacrifice).value(_amount)(_to);
+            (new Sacrifice){value:_amount}(_to);
         }
     }
 }

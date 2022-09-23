@@ -5,9 +5,6 @@ import '../../contracts/base/StakingHbbftBase.sol';
 
 
 contract StakingHbbftBaseMock is StakingHbbftBase {
-
-
-
     // =============================================== Setters ========================================================
 
     function addPoolActiveMock(address _stakingAddress)
@@ -15,7 +12,8 @@ contract StakingHbbftBaseMock is StakingHbbftBase {
         _addPoolActive(_stakingAddress, true);
     }
 
-    function addPoolInactiveMock(address _stakingAddress) public {
+    function addPoolInactiveMock(address _stakingAddress)
+    public {
         _addPoolInactive(_stakingAddress);
     }
 
@@ -54,11 +52,14 @@ contract StakingHbbftBaseMock is StakingHbbftBase {
         validatorSetContract = _validatorSetAddress;
     }
 
-    // =============================================== Getters ========================================
-
     // =============================================== Private ========================================================
 
-    function _getMaxCandidates() internal pure returns(uint256) {
+    function _getMaxCandidates()
+    internal
+    pure
+    override
+    virtual
+    returns(uint256) {
         return 100;
     }
 

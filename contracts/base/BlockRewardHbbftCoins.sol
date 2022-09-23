@@ -27,7 +27,7 @@ contract BlockRewardHbbftCoins is BlockRewardHbbftBase, IBlockRewardHbbftCoins {
     /// @param _delegatorStake The stake amount placed by some delegator into the `_poolMiningAddress` pool.
     /// @param _stakingEpoch The serial number of staking epoch.
     /// @param _poolMiningAddress The pool mining address.
-    /// @return `uint256 nativeReward` - the reward amount in native coins.
+    /// @return nativeReward The reward amount in native coins.
     function getDelegatorReward(
         uint256 _delegatorStake,
         uint256 _stakingEpoch,
@@ -53,7 +53,7 @@ contract BlockRewardHbbftCoins is BlockRewardHbbftBase, IBlockRewardHbbftCoins {
     /// Used by the `StakingHbbft.claimReward` function.
     /// @param _stakingEpoch The serial number of staking epoch.
     /// @param _poolMiningAddress The pool mining address.
-    /// @return `uint256 nativeReward` - the reward amount in native coins.
+    /// @return nativeReward The reward amount in native coins.
     function getValidatorReward(
         uint256 _stakingEpoch,
         address _poolMiningAddress

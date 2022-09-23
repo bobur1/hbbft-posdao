@@ -6,6 +6,11 @@ import '../../contracts/base/BlockRewardHbbftCoins.sol';
 
 
 contract BlockRewardHbbftCoinsMock is BlockRewardHbbftCoins, BlockRewardHbbftBaseMock {
+    modifier onlySystem() virtual override(BlockRewardHbbftBase, BlockRewardHbbftBaseMock) {
+       require(msg.sender == _getSystemAddress());
+        _;
+    }
+    
     function setEpochPoolReward(
         uint256 _stakingEpoch,
         address _poolMiningAddress

@@ -5,11 +5,12 @@ import "./interfaces/ICertifier.sol";
 import "./interfaces/IStakingHbbft.sol";
 import "./interfaces/IValidatorSetHbbft.sol";
 import "./upgradeability/UpgradeableOwned.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 
 /// @dev Allows validators to use a zero gas price for their service transactions
 /// (see https://wiki.parity.io/Permissioning.html#gas-price for more info).
-contract CertifierHbbft is UpgradeableOwned, ICertifier {
+contract CertifierHbbft is UpgradeableOwned, ICertifier, Initializable {
 
     // =============================================== Storage ========================================================
 
@@ -34,14 +35,6 @@ contract CertifierHbbft is UpgradeableOwned, ICertifier {
     /// @param who Specified address for which zero gas price transactions are denied.
     event Revoked(address indexed who);
 
-    // ============================================== Modifiers =======================================================
-
-    /// @dev Ensures the `initialize` function was called before.
-    modifier onlyInitialized {
-        require(isInitialized(), "Contract requires to be initialized()");
-        _;
-    }
-
     // =============================================== Setters ========================================================
 
     /// @dev Initializes the contract at network startup.
@@ -51,10 +44,9 @@ contract CertifierHbbft is UpgradeableOwned, ICertifier {
     function initialize(
         address[] calldata _certifiedAddresses,
         address _validatorSet
-    ) external {
+    ) external initializer {
         require(msg.sender == _admin() || tx.origin == _admin() || address(0) == _admin() || block.number == 0, 
             "Sender must be admin");
-        require(!isInitialized(), "Contract is already initialized");
         require(_validatorSet != address(0), "Validatorset must not be 0");
         for (uint256 i = 0; i < _certifiedAddresses.length; i++) {
             _certify(_certifiedAddresses[i]);
@@ -65,14 +57,14 @@ contract CertifierHbbft is UpgradeableOwned, ICertifier {
     /// @dev Allows the specified address to use a zero gas price for its transactions.
     /// Can only be called by the `owner`.
     /// @param _who The address for which zero gas price transactions must be allowed.
-    function certify(address _who) external onlyOwner onlyInitialized {
+    function certify(address _who) external onlyOwner onlyInitializing {
         _certify(_who);
     }
 
     /// @dev Denies the specified address usage of a zero gas price for its transactions.
     /// Can only be called by the `owner`.
     /// @param _who The address for which transactions with a zero gas price must be denied.
-    function revoke(address _who) external onlyOwner onlyInitialized {
+    function revoke(address _who) external onlyOwner onlyInitializing {
         _certified[_who] = false;
         emit Revoked(_who);
     }
@@ -103,7 +95,7 @@ contract CertifierHbbft is UpgradeableOwned, ICertifier {
         // since the node cache the list of certifiers
         // and the permission contracts checks anyway, 
         // if the specific 0 gas transaction is allowed or not.
-        IStakingHbbft stakingContract = IStakingHbbft(validatorSetContract.stakingContract());
+        // IStakingHbbft stakingContract = IStakingHbbft(validatorSetContract.stakingContract());
         return stakingAddress != address(0);
     }
 
@@ -117,14 +109,6 @@ contract CertifierHbbft is UpgradeableOwned, ICertifier {
     view
     returns(bool) {
         return _certified[_who];
-    }
-
-    /// @dev Returns a boolean flag indicating if the `initialize` function has been called.
-    function isInitialized()
-    public
-    view
-    returns(bool) {
-        return validatorSetContract != IValidatorSetHbbft(0);
     }
 
     // ============================================== Internal ========================================================

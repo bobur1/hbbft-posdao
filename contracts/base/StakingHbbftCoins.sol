@@ -6,7 +6,7 @@ import "../interfaces/IBlockRewardHbbftCoins.sol";
 
 
 contract Sacrifice2 {
-    constructor(address payable _recipient) public payable {
+    constructor(address payable _recipient) payable {
         selfdestruct(_recipient);
     }
 }
@@ -43,8 +43,8 @@ contract StakingHbbftCoins is StakingHbbftBase {
     )
     public
     gasPriceIsValid
-    onlyInitialized {
-        address payable staker = msg.sender;
+    onlyInitializing {
+        address payable staker = payable(msg.sender);
         uint256 firstEpoch;
         uint256 lastEpoch;
 
@@ -94,7 +94,7 @@ contract StakingHbbftCoins is StakingHbbftBase {
                 reward = blockRewardContract.getValidatorReward(epoch, miningAddress);
             }
 
-            rewardSum = rewardSum.add(reward);
+            rewardSum += reward;
 
             rewardWasTaken[_poolStakingAddress][staker][epoch] = true;
 
@@ -172,12 +172,14 @@ contract StakingHbbftCoins is StakingHbbftBase {
     /// @param _to The target address to send amount to.
     /// @param _amount The amount to send.
     function _sendWithdrawnStakeAmount(address payable _to, uint256 _amount)
+    override
+    virtual
     internal {
         if (!_to.send(_amount)) {
             // We use the `Sacrifice` trick to be sure the coins can be 100% sent to the receiver.
             // Otherwise, if the receiver is a contract which has a revert in its fallback function,
             // the sending will fail.
-            (new Sacrifice2).value(_amount)(_to);
+            (new Sacrifice2){value: _amount}(_to);
         }
     }
 

@@ -7,11 +7,12 @@ import "./interfaces/IRandomHbbft.sol";
 import "./interfaces/IStakingHbbft.sol";
 import "./interfaces/IValidatorSetHbbft.sol";
 import "./upgradeability/UpgradeableOwned.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 
 /// @dev Stores the current validator set and contains the logic for choosing new validators
 /// before each staking epoch. The logic uses a random seed generated and stored by the `RandomHbbft` contract.
-contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
+contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft, Initializable {
 
     // =============================================== Storage ========================================================
 
@@ -112,12 +113,6 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
 
     // ============================================== Modifiers =======================================================
 
-    /// @dev Ensures the `initialize` function was called before.
-    modifier onlyInitialized {
-        require(isInitialized(), "ValidatorSet: not initialized");
-        _;
-    }
-
     /// @dev Ensures the caller is the BlockRewardHbbft contract address.
     modifier onlyBlockRewardContract() {
         require(msg.sender == blockRewardContract, "Only BlockReward contract");
@@ -137,7 +132,7 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
     }
 
     /// @dev Ensures the caller is the SYSTEM_ADDRESS. See https://wiki.parity.io/Validator-Set.html
-    modifier onlySystem() {
+    modifier onlySystem() virtual {
         require(msg.sender == 0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE, "Only System");
         _;
     }
@@ -146,6 +141,7 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
     function getCurrentTimestamp()
     external
     view
+    virtual
     returns(uint256) {
         return block.timestamp;
     }
@@ -174,11 +170,11 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
         address _keyGenHistoryContract,
         address[] calldata _initialMiningAddresses,
         address[] calldata _initialStakingAddresses
-    ) external {
+    ) external
+    initializer {
         require(msg.sender == _admin() || tx.origin ==  _admin() 
             || address(0) ==  _admin() || block.number == 0, 
             "ValidatorSet: Initialization only on genesis block or by admin");
-        require(!isInitialized(), "ValidatorSet contract is already initialized");
         require(_blockRewardContract != address(0), "BlockReward contract address can't be 0x0");
         require(_randomContract != address(0), "Random contract address can't be 0x0");
         require(_stakingContract != address(0), "Staking contract address can't be 0x0");
@@ -412,7 +408,7 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
         bytes calldata
     )
     external
-    onlyInitialized {
+    onlyInitializing {
         address reportingMiningAddress = msg.sender;
 
         _incrementReportingCounter(reportingMiningAddress);
@@ -449,11 +445,11 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
         if (validatorsLength > 3) {
             // If more than 2/3 of validators reported about malicious validator
             // for the same `blockNumber`
-            remove = reportedValidators.length.mul(3) > validatorsLength.mul(2);
+            remove = reportedValidators.length * 3 > validatorsLength * 2;
         } else {
             // If more than 1/2 of validators reported about malicious validator
             // for the same `blockNumber`
-            remove = reportedValidators.length.mul(2) > validatorsLength;
+            remove = reportedValidators.length * 2 > validatorsLength;
         }
 
         if (remove) {
@@ -535,11 +531,6 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
         return _currentValidators;
     }
 
-    /// @dev Returns a boolean flag indicating if the `initialize` function has been called.
-    function isInitialized() public view returns(bool) {
-        return blockRewardContract != address(0);
-    }
-
     /// @dev Returns a boolean flag indicating whether the specified validator (mining address)
     /// is able to call the `reportMalicious` function or whether the specified validator (mining address)
     /// can be reported as malicious. This function also allows a validator to call the `reportMalicious`
@@ -549,12 +540,12 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
     /// @param _miningAddress The validator's mining address.
     function isReportValidatorValid(address _miningAddress) public view returns(bool) {
         bool isValid = isValidator[_miningAddress] && !isValidatorBanned(_miningAddress);
-        if (stakingContract.stakingEpoch() == 0) {
+        if (stakingContract.getStakingEpoch() == 0) {
             return isValid;
         }
         // TO DO: arbitrarily chosen period stakingFixedEpochDuration/5.
-        if (this.getCurrentTimestamp() - stakingContract.stakingEpochStartTime() 
-            <= stakingContract.stakingFixedEpochDuration()/5) {
+        if (this.getCurrentTimestamp() - stakingContract.getStakingEpochStartTime() 
+            <= stakingContract.getStakingFixedEpochDuration()/5) {
             // The current validator set was finalized by the engine,
             // but we should let the previous validators finish
             // reporting malicious validator within a few blocks
@@ -697,8 +688,8 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
     /// @param _maliciousMiningAddress The mining address of the malicious validator which is passed to
     /// the `reportMalicious` function.
     /// @param _blockNumber The block number which is passed to the `reportMalicious` function.
-    /// @return `bool callable` - The boolean flag indicating whether the `reportMalicious` function can be called at
-    /// the moment. `bool removeReportingValidator` - The boolean flag indicating whether the reporting validator
+    /// @return callable The boolean flag indicating whether the `reportMalicious` function can be called at
+    /// @return removeReportingValidator The boolean flag indicating whether the reporting validator
     /// should be removed as malicious due to excessive reporting. This flag is only used by the `reportMalicious`
     /// function.
     function reportMaliciousCallable(
@@ -715,7 +706,7 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
         uint256 validatorsNumber = _currentValidators.length;
 
         if (validatorsNumber > 1) {
-            uint256 currentStakingEpoch = stakingContract.stakingEpoch();
+            uint256 currentStakingEpoch = stakingContract.getStakingEpoch();
             uint256 reportsNumber = reportingCounter[_reportingMiningAddress][currentStakingEpoch];
             uint256 reportsTotalNumber = reportingCounterTotal[currentStakingEpoch];
             uint256 averageReportsNumber = 0;
@@ -765,6 +756,10 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
         return stakingContract.getPoolPublicKey(stakingByMiningAddress[_miningAddress]);
     }
 
+    function getStakingContract() external view returns(address) {
+        return address(stakingContract);
+    }
+
     /// @dev in Hbbft there are sweet spots for the choice of validator counts
     /// those are FLOOR((n - 1)/3) * 3 + 1
     /// values: 1 - 4 - 7 - 10 - 13 - 16 - 19 - 22 - 25
@@ -790,7 +785,7 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
     /// @param _miningAddress The mining address of the removed malicious validator.
     function _clearReportingCounter(address _miningAddress)
     internal {
-        uint256 currentStakingEpoch = stakingContract.stakingEpoch();
+        uint256 currentStakingEpoch = stakingContract.getStakingEpoch();
         uint256 total = reportingCounterTotal[currentStakingEpoch];
         uint256 counter = reportingCounter[_miningAddress][currentStakingEpoch];
 
@@ -920,7 +915,7 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
     function _incrementReportingCounter(address _reportingMiningAddress)
     internal {
         if (!isReportValidatorValid(_reportingMiningAddress)) return;
-        uint256 currentStakingEpoch = stakingContract.stakingEpoch();
+        uint256 currentStakingEpoch = stakingContract.getStakingEpoch();
         reportingCounter[_reportingMiningAddress][currentStakingEpoch]++;
         reportingCounterTotal[currentStakingEpoch]++;
     }
@@ -966,7 +961,7 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
             if (_currentValidators[i] == _miningAddress) {
                 // Remove the malicious validator from `_pendingValidators`
                 _currentValidators[i] = _currentValidators[length - 1];
-                _currentValidators.length--;
+                _currentValidators.pop();
                 return true;
             }
         }
@@ -1023,7 +1018,7 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
                 address pvStakingAddress = stakingByMiningAddress[pvMiningAddress];
                 if (
                     stakingContract.isPoolActive(pvStakingAddress) &&
-                    stakingContract.orderedWithdrawAmount(pvStakingAddress, pvStakingAddress) == 0
+                    stakingContract.getOrderedWithdrawAmount(pvStakingAddress, pvStakingAddress) == 0
                 ) {
                     // The validator has an active pool and is not going to withdraw their
                     // entire stake, so this validator doesn't want to exit from the validator set
@@ -1063,10 +1058,10 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft {
     /// Used by the `_removeMaliciousValidator` internal function.
     function _banUntil() internal view returns(uint256) {
         uint256 currentTimestamp = this.getCurrentTimestamp();
-        uint256 ticksUntilEnd = stakingContract.stakingFixedEpochEndTime().sub(currentTimestamp);
+        uint256 ticksUntilEnd = stakingContract.stakingFixedEpochEndTime() - currentTimestamp;
         // Ban for at least 12 full staking epochs: 
         // currentTimestampt + stakingFixedEpochDuration + remainingEpochDuration. 
-        return currentTimestamp.add(12 * stakingContract.stakingFixedEpochDuration()).add(ticksUntilEnd);
+        return currentTimestamp + 12 * stakingContract.getStakingFixedEpochDuration() + ticksUntilEnd;
     }
 
     /// @dev Returns an index of a pool in the `poolsToBeElected` array

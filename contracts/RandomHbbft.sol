@@ -21,7 +21,7 @@ contract RandomHbbft is UpgradeabilityAdmin, IRandomHbbft {
     // ============================================== Modifiers =======================================================
 
     /// @dev Ensures the caller is the SYSTEM_ADDRESS. See https://wiki.parity.io/Validator-Set.html
-    modifier onlySystem() {
+    modifier onlySystem() virtual {
         require(msg.sender == 0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE, "Must be executed by System");
         _;
     }

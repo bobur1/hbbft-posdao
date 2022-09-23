@@ -6,8 +6,11 @@ import "./interfaces/IKeyGenHistory.sol";
 import "./interfaces/IValidatorSetHbbft.sol";
 import "./upgradeability/UpgradeabilityAdmin.sol";
 import "./interfaces/IStakingHbbft.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract KeyGenHistory is UpgradeabilityAdmin, IKeyGenHistory {
+
+
+contract KeyGenHistory is UpgradeabilityAdmin, IKeyGenHistory, Initializable {
 
     // =============================================== Storage ========================================================
 
@@ -39,12 +42,6 @@ contract KeyGenHistory is UpgradeabilityAdmin, IKeyGenHistory {
 
     event NewValidatorsSet(address[] newValidatorSet);
 
-    /// @dev Ensures the `initialize` function was called before.
-    modifier onlyInitialized {
-        require(isInitialized(), "KeyGenHistory requires to be initialized");
-        _;
-    }
-
     /// @dev Ensures the caller is the SYSTEM_ADDRESS. See https://wiki.parity.io/Validator-Set.html
     modifier onlySystem() {
         require(msg.sender == 0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE, "Must be executed by System");
@@ -60,7 +57,7 @@ contract KeyGenHistory is UpgradeabilityAdmin, IKeyGenHistory {
     /// @dev ensures that Key Generation functions are called with wrong _epoch 
     /// parameter to prevent old and wrong transactions get picked up.
     modifier onlyUpcommingEpoch(uint _epoch) {
-        require(IStakingHbbft(validatorSetContract.stakingContract()).stakingEpoch() + 1 == _epoch, 
+        require(IStakingHbbft(validatorSetContract.getStakingContract()).getStakingEpoch() + 1 == _epoch, 
             "Key Generation function called with wrong _epoch parameter.");
         _;
     }
@@ -105,11 +102,12 @@ contract KeyGenHistory is UpgradeabilityAdmin, IKeyGenHistory {
         address[] memory _validators,
         bytes[] memory _parts,
         bytes[][] memory _acks
-    ) public {
+    )
+    public
+    initializer {
         // Unit Tests may deploy at block numbers other than 0.
         require(msg.sender == _admin() || tx.origin ==  _admin() 
             || address(0) ==  _admin() || block.number == 0, "Sender must be admin");
-        require(!isInitialized(), "initialization can only be done once"); // initialization can only be done once
         require(_validators.length != 0, "Validators must be more than 0.");
         require(_validators.length == _parts.length, "Wrong number of Parts!");
         require(_validators.length == _acks.length, "Wrong number of Acks!");
@@ -175,13 +173,5 @@ contract KeyGenHistory is UpgradeabilityAdmin, IKeyGenHistory {
     view 
     returns(uint128, uint128) {
         return (numberOfPartsWritten, numberOfAcksWritten);
-    }
-
-    /// @dev Returns a boolean flag indicating if the `initialize` function has been called.
-    function isInitialized()
-    public
-    view
-    returns(bool) {
-        return validatorSetContract != IValidatorSetHbbft(0);
     }
 }

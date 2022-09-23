@@ -40,7 +40,7 @@ interface IValidatorSetHbbft {
     function stakingByMiningAddress(address) external view returns(address);
     function publicKeyByStakingAddress(address) external view returns(bytes memory);
     function getPublicKey(address) external view returns(bytes memory);
-    function stakingContract() external view returns(address);
+    function getStakingContract() external view returns(address);
     function getCurrentTimestamp() external view returns(uint256);
     function validatorAvailableSince(address) external view returns(uint256);
 }

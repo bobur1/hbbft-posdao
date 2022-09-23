@@ -8,14 +8,14 @@ import "./interfaces/IStakingHbbft.sol";
 import "./interfaces/ITxPermission.sol";
 import "./interfaces/IValidatorSetHbbft.sol";
 import "./upgradeability/UpgradeableOwned.sol";
-
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 
 
 /// @dev Controls the use of zero gas price by validators in service transactions,
 /// protecting the network against "transaction spamming" by malicious validators.
 /// The protection logic is declared in the `allowedTxTypes` function.
-contract TxPermissionHbbft is UpgradeableOwned, ITxPermission {
+contract TxPermissionHbbft is UpgradeableOwned, ITxPermission, Initializable {
 
     // =============================================== Storage ========================================================
 
@@ -48,14 +48,6 @@ contract TxPermissionHbbft is UpgradeableOwned, ITxPermission {
     /// @dev defines the block gas limit, respected by the hbbft validators.
     uint256 public blockGasLimit;
 
-    // ============================================== Modifiers =======================================================
-
-    /// @dev Ensures the `initialize` function was called before.
-    modifier onlyInitialized {
-        require(isInitialized());
-        _;
-    }
-
     // =============================================== Setters ========================================================
 
     /// @dev Initializes the contract at network startup.
@@ -70,9 +62,9 @@ contract TxPermissionHbbft is UpgradeableOwned, ITxPermission {
         address _certifier,
         address _validatorSet,
         address _keyGenHistoryContract
-    ) external {
+    ) external
+    initializer {
         require(msg.sender == _admin() || tx.origin ==  _admin() || address(0) == _admin() || block.number == 0);
-        require(!isInitialized(), "initialization can only be done once");
         require(_certifier != address(0));
         require(_validatorSet != address(0), "ValidatorSet must not be 0");
         for (uint256 i = 0; i < _allowed.length; i++) {
@@ -91,7 +83,7 @@ contract TxPermissionHbbft is UpgradeableOwned, ITxPermission {
     function addAllowedSender(address _sender)
     public
     onlyOwner
-    onlyInitialized {
+    onlyInitializing {
         _addAllowedSender(_sender);
     }
 
@@ -102,7 +94,7 @@ contract TxPermissionHbbft is UpgradeableOwned, ITxPermission {
     function removeAllowedSender(address _sender)
     public
     onlyOwner
-    onlyInitialized {
+    onlyInitializing {
         require(isSenderAllowed[_sender]);
 
         uint256 allowedSendersLength = _allowedSenders.length;
@@ -129,7 +121,7 @@ contract TxPermissionHbbft is UpgradeableOwned, ITxPermission {
     function setMinimumGasPrice(uint256 _value)
     public
     onlyOwner
-    onlyInitialized {
+    onlyInitializing {
 
         // currently, we do not allow to set the minimum gas price to 0,
         // that would open pandoras box, and the consequences of doing that, 
@@ -144,7 +136,7 @@ contract TxPermissionHbbft is UpgradeableOwned, ITxPermission {
     function setBlockGasLimit(uint256 _value)
     public
     onlyOwner
-    onlyInitialized {
+    onlyInitializing {
 
         // we make some check that the block gas limit can not be set to low, 
         // to prevent the chain to be completly inoperatable.
@@ -282,7 +274,7 @@ contract TxPermissionHbbft is UpgradeableOwned, ITxPermission {
 
                     uint256 epochNumber = _getSliceUInt256(4, _data);
 
-                    if (epochNumber == IStakingHbbft(validatorSetContract.stakingContract()).stakingEpoch() + 1) {
+                    if (epochNumber == IStakingHbbft(validatorSetContract.getStakingContract()).getStakingEpoch() + 1) {
                         return (CALL, false);
                     } else {
                         return (NONE, false);
@@ -308,14 +300,14 @@ contract TxPermissionHbbft is UpgradeableOwned, ITxPermission {
                     //is the correct epoch parameter passed ?
 
                     if (_getSliceUInt256(4, _data) 
-                        == IStakingHbbft(validatorSetContract.stakingContract()).stakingEpoch() + 1) {
+                        == IStakingHbbft(validatorSetContract.getStakingContract()).getStakingEpoch() + 1) {
                         return (CALL, false);
                     }
 
                     // is the correct round passed ? (filters out messages from earlier key gen rounds.)
 
                     if (_getSliceUInt256(36, _data) 
-                        == IStakingHbbft(validatorSetContract.stakingContract()).stakingEpoch() + 1) {
+                        == IStakingHbbft(validatorSetContract.getStakingContract()).getStakingEpoch() + 1) {
                         return (CALL, false);
                     }
 
@@ -351,14 +343,6 @@ contract TxPermissionHbbft is UpgradeableOwned, ITxPermission {
         // In other cases let the `_sender` create any transaction with non-zero gas price,
         // as long the gas price is above the minimum gas price.
         return (_gasPrice >= minimumGasPrice ? ALL : NONE, false);
-    }
-
-    /// @dev Returns a boolean flag indicating if the `initialize` function has been called.
-    function isInitialized()
-    public
-    view
-    returns(bool) {
-        return validatorSetContract != IValidatorSetHbbft(0);
     }
 
     // ============================================== Internal ========================================================

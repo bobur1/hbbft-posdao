@@ -6,8 +6,7 @@ contract Migrations {
     address public owner;
     uint public last_completed_migration; // solhint-disable-line
 
-    constructor()
-    public {
+    constructor() {
         owner = msg.sender;
     }
 
