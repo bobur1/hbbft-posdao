@@ -43,4 +43,6 @@ interface IValidatorSetHbbft {
     function getStakingContract() external view returns(address);
     function getCurrentTimestamp() external view returns(uint256);
     function validatorAvailableSince(address) external view returns(uint256);
+    // Changes for issues-129
+    function removeValidatorAvailability(address) external;
 }

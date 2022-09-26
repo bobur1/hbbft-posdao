@@ -6,6 +6,8 @@ import "../interfaces/IStakingHbbft.sol";
 import "../interfaces/IValidatorSetHbbft.sol";
 import "../upgradeability/UpgradeableOwned.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+// change it to interface
+import "../ValidatorSetHbbft.sol";
 
 
 /// @dev Implements staking and withdrawal logic.
@@ -1311,6 +1313,12 @@ contract StakingHbbftBase is UpgradeableOwned, IStakingHbbft, Initializable {
 
         if (newStakeAmount == 0) {
             _withdrawCheckPool(_poolStakingAddress, _staker);
+        }
+
+        // Changes for issues-129
+        if( newStakeAmount < candidateMinStake && _poolStakingAddress != _staker) {
+            // change availability for validators with less than min stake amount
+            validatorSetContract.removeValidatorAvailability(_staker);
         }
 
         if (_staker != _poolStakingAddress) {

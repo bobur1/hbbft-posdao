@@ -196,7 +196,6 @@ contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft, Initializa
 
         if (_isEpochEndBlock) {
 
-            
             uint256 stakingEpoch = stakingContract.getStakingEpoch();
 
             uint256 nativeTotalRewardAmount;
@@ -492,6 +491,11 @@ contract BlockRewardHbbftBase is UpgradeableOwned, IBlockRewardHbbft, Initializa
         uint256 numRewardedValidators;
 
         for (uint256 i = 0; i < validators.length; i++) {
+            // check if reward available for this epoch
+            // issues-132
+            if (validatorSetContract.validatorAvailableSince(validators[i]) == 0
+            ||  validatorSetContract.validatorAvailableSince(validators[i]) > block.number)
+            continue;
             if (
                 !validatorSetContract.isValidatorBanned(validators[i]) &&
                 snapshotPoolValidatorStakeAmount[_stakingEpoch][validators[i]] != 0

@@ -60,6 +60,10 @@ function getChainConfig(chain: keyof typeof chainIds): NetworkUserConfig {
       path: "m/44'/60'/0'/0",
     },
     chainId: chainIds[chain],
+    gas: 21_000_000_000,
+    gasPrice: 8000000000,
+    allowUnlimitedContractSize: true,
+    blockGasLimit: 100000000429720,
     url: jsonRpcUrl,
   };
 }

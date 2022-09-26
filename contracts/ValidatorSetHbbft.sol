@@ -267,6 +267,14 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft, Initializabl
         }
     }
 
+    // Changes for issues-129
+    function removeValidatorAvailability(address _validator)
+    external {
+        require(msg.sender == address(stakingContract), "Only staking contract can call this function");
+        validatorAvailableSince[_validator] = 0;
+        emit ValidatorUnavailable(_validator, this.getCurrentTimestamp());
+    }
+
     /// @dev called by blockreward contract when a the reward when the block reward contract 
     /// came to the conclusion that the validators could not manage to create a new shared key together.
     /// this starts the process to find replacements for the failing candites,
@@ -316,6 +324,7 @@ contract ValidatorSetHbbft is UpgradeableOwned, IValidatorSetHbbft, Initializabl
         // temporary array to keep track of the good validators.
         // not all storage slots might be used.
         // we asume that there is at minimum 1 bad validator.
+        // ToDo:: change it
         address[] memory goodValidators = new address[](_pendingValidators.length - 1);
         uint goodValidatorsCount = 0;
 
